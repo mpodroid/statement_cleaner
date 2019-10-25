@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
-import datetime
+from datetime import datetime
 import os
 import shutil
 import subprocess
@@ -13,21 +13,33 @@ import docker
 QPDF_PATH = "/usr/local/bin/qpdf"
 
 
-def credit_card_formatter(filename):
-    parts = filename.split("_")
-    dp = parts[1].split(".")[0]
-    d = datetime.datetime.strptime(dp, "%d%m%Y").strftime("%Y-%m-%d")
-    return parts[0] + "_" + d + ".pdf"
+class Profile:
+    def __init__(self, pattern, date_index, date_format, out_format):
+        self.pattern = re.compile(pattern)
+        self.date_index = date_index
+        self.date_format = date_format
+        self.out_format = out_format
+
+    def match(self, filename):
+        return self.pattern.match(filename)
+
+    def format(self, filename):
+        p = self.pattern.match(filename)
+        groups = p.groups()
+        output = self.out_format
+        for i in range(0, len(groups)):
+            output = output.replace('\\' + str(i), groups[i])
+
+        date = datetime.strptime(groups[self.date_index], self.date_format).strftime('%Y-%m-%d')
+        output = output.replace('\\d', date)
+        return output
 
 
-def account_formatter(filename):
-    parts = filename.split("_")
-    dp = parts[1]
-    d = datetime.datetime.strptime(dp, "%d %b %Y").strftime("%Y-%m-%d")
-    account = parts[2].split(".")[0]
-    if account == "201":
-        account = "8201"
-    return parts[0] + "_" + account + "_" + d + ".pdf"
+profiles = {
+    'cc_pattern': Profile('(\d{4})-XXXX-XXXX-(\d{4})_(\d{8}).pdf', 2, '%d%m%Y', 'CC-\\1_\\d.pdf'),
+    'acc_pattern': Profile('E-STATEMENT_(\d{2} \S{3} \d{4})_(\d{3}).pdf', 0, '%d %b %Y', 'ACC-8\\1_\\d.pdf'),
+    'acc2_pattern': Profile('E-STATEMENT_(\d{2} \S{3} \d{4})_(\d{4}).pdf', 0, '%d %b %Y', 'ACC-\\1_\\d.pdf')
+}
 
 
 def process_file(file, password=None, out_dir=None, qpdf_path=None):
@@ -35,10 +47,17 @@ def process_file(file, password=None, out_dir=None, qpdf_path=None):
     in_dir = os.path.dirname(file)
 
     out_file = ''
-    if re.match("\\w{4}-\\w{4}-\\w{4}-\\w{4}", in_file):
-        out_file = credit_card_formatter(in_file)
-    if in_file.startswith("E-STATEMENT"):
-        out_file = account_formatter(in_file)
+    profile = None
+    for p in profiles.keys():
+        if profiles[p].match(in_file):
+            profile = profiles[p]
+            continue
+    if not profile:
+        print('No profile matching {}. Skip'.format(file))
+        return
+
+    out_file = profile.format(in_file)
+
 
     if out_dir:
         if not os.path.exists(out_dir):
@@ -46,13 +65,15 @@ def process_file(file, password=None, out_dir=None, qpdf_path=None):
     else:
         out_dir = in_dir
 
+    ofile = os.path.join(out_dir, out_file)
     if password:
         # decrypt PDF
         print("Decrypting {}...".format(file), sep="", end="", flush=True)
         exec_qpdf(in_dir, in_file, out_dir, out_file, password, qpdf_path)
-        print("\rDecrypted {}{}".format(out_file, " " * 20))
+        print("\rDecrypted {}{}".format(ofile, " " * 40))
     else:
-        shutil.copyfile(file, os.path.join(out_dir, out_file))
+        print("Renamed {}".format(ofile))
+        shutil.copyfile(file, ofile)
 
 
 def exec_qpdf(in_dir, in_file, out_dir, out_file, password, qpdf_path):
@@ -60,7 +81,6 @@ def exec_qpdf(in_dir, in_file, out_dir, out_file, password, qpdf_path):
         qpdf_path = QPDF_PATH
 
     if qpdf_path.startswith("/"):
-        print("QPDF: local execution")
         ifile = os.path.join(in_dir, in_file)
         ofile = os.path.join(out_dir, out_file)
         proc = subprocess.run([QPDF_PATH, "--password={}".format(password), "--decrypt", ifile, ofile],
@@ -68,25 +88,21 @@ def exec_qpdf(in_dir, in_file, out_dir, out_file, password, qpdf_path):
         if proc.returncode != 3 and proc.returncode != 0:
             print(proc.stderr)
     else:
-        print("QPDF: docker execution")
         try:
             client = docker.from_env()
             in_dir = os.path.abspath(in_dir)
             out_dir = os.path.abspath(out_dir)
-            volumes = [{in_dir: {'bind': '/pdf/input', 'mode': 'ro'}},
-                       {out_dir: {'bind': '/pdf/output', 'mode': 'rw'}}]
 
             c = client.containers.create(volumes=[in_dir + ':/pdf/input', out_dir + ':/pdf/output'],
                                          image=qpdf_path,
-                                         command='/usr/bin/qpdf --password={} --decrypt {} {}'
+                                         command='/usr/bin/qpdf --password={} --decrypt "{}" "{}"'
                                          .format(password,
                                                  os.path.join('/pdf/input', in_file),
                                                  os.path.join('/pdf/output', out_file)))
             c.start()
-        except docker.errors.ContainerError as ce:
+        except Exception as ce:
             # catch qpdf code different from 0
             print(ce)
-            pass
 
 def main():
     parser = argparse.ArgumentParser(prog="statement_cleaner",
