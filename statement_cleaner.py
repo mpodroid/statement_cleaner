@@ -8,17 +8,19 @@ import subprocess
 import glob
 import re
 import docker
+import json
 
 # Using QPDF to decrypt file
 QPDF_PATH = "/usr/local/bin/qpdf"
 
 
 class Profile:
-    def __init__(self, pattern, date_index, date_format, out_format):
+    def __init__(self, pattern, date_index, date_format, out_format, password):
         self.pattern = re.compile(pattern)
         self.date_index = date_index
         self.date_format = date_format
         self.out_format = out_format
+        self.password = password
 
     def match(self, filename):
         return self.pattern.match(filename)
@@ -34,15 +36,20 @@ class Profile:
         output = output.replace('\\d', date)
         return output
 
+    def __str__(self):
+        return str(self.__dict__)
 
-profiles = {
-    'cc_pattern': Profile('(\d{4})-XXXX-XXXX-(\d{4})_(\d{8}).pdf', 2, '%d%m%Y', 'CC-\\1_\\d.pdf'),
-    'acc_pattern': Profile('E-STATEMENT_(\d{2} \S{3} \d{4})_(\d{3}).pdf', 0, '%d %b %Y', 'ACC-8\\1_\\d.pdf'),
-    'acc2_pattern': Profile('E-STATEMENT_(\d{2} \S{3} \d{4})_(\d{4}).pdf', 0, '%d %b %Y', 'ACC-\\1_\\d.pdf')
-}
+    def __repr__(self):
+        return self.__str__()
+
+    @staticmethod
+    def json_load(json_file):
+        with open(json_file) as file:
+            data = json.load(file)
+        return Profile(data["pattern"], data["date_index"], data["date_format"], data["output_format"], data["password"])
 
 
-def process_file(file, password=None, out_dir=None, qpdf_path=None):
+def process_file(file, profiles, password=None, out_dir=None, qpdf_path=None):
     in_file = os.path.basename(file)
     in_dir = os.path.dirname(file)
 
@@ -66,6 +73,8 @@ def process_file(file, password=None, out_dir=None, qpdf_path=None):
         out_dir = in_dir
 
     ofile = os.path.join(out_dir, out_file)
+
+    password = password if password else profile.password
     if password:
         # decrypt PDF
         print("Decrypting {}...".format(file), sep="", end="", flush=True)
@@ -104,6 +113,17 @@ def exec_qpdf(in_dir, in_file, out_dir, out_file, password, qpdf_path):
             # catch qpdf code different from 0
             print(ce)
 
+def get_profiles():
+    profiles = {}
+    for p in glob.glob(os.path.join("profiles", "*.json")):
+        name = os.path.basename(p).split(".")[0]
+        profiles[name] = Profile.json_load(p)
+    if len(profiles) == 0:
+        print("No profiles directory found. Exit")
+        os.sys.exit(1)
+    return profiles
+
+
 def main():
     parser = argparse.ArgumentParser(prog="statement_cleaner",
                                      description="Cleanup bank statements PDF files, formatting dates with ISO format "
@@ -122,14 +142,15 @@ def main():
     args = parser.parse_args()
 
     qpdf_path = args.qpdf_docker_image if args.qpdf_docker_image else args.qpdf_path
-    print(args)
+    profiles = get_profiles()
+
     if args.indir:
         # process all PDF files in the directory
         for file in glob.glob(os.path.join(args.indir, "*.pdf")):
-            process_file(file, args.password, args.outdir, qpdf_path)
+            process_file(file, profiles, args.password, args.outdir, qpdf_path)
     else:
         # process one single file
-        process_file(args.file, args.password, args.outdir, qpdf_path)
+        process_file(args.file, profiles, args.password, args.outdir, qpdf_path)
 
 
 

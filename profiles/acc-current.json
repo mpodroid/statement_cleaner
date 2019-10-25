@@ -1,0 +1,7 @@
+{
+    "pattern": "E-STATEMENT_(\\d{2} \\S{3} \\d{4})_(\\d{4}).pdf",
+    "date_index": 0,
+    "date_format": "%d %b %Y",
+    "output_format": "ACC-\\1_\\d.pdf",
+    "password": "mypdfpawd"
+}

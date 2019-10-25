@@ -1,0 +1,7 @@
+{
+    "pattern": "(5\\d{3})-XXXX-XXXX-(\\d{4})_(\\d{8}).pdf",
+    "date_index": 2,
+    "date_format": "%d%m%Y",
+    "output_format": "CC-MSTC-\\1_\\d.pdf",
+    "password": "mypdfpawd"
+}
