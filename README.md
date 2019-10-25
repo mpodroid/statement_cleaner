@@ -9,6 +9,11 @@ My bank send me statements via email, but there are two issues I am not conforta
 This python utility rename the file to use date in ISO format, so name sorting overlaps with date sorting.
 It also remote password protection, using qpdf utility.
 
+In order to remove PDF password, qpdf tool is required:
+
+    apt-get install qpdf # debian based linux
+    brew install qpdf    # macOS
+
 Examples
 ========
 
