@@ -20,19 +20,19 @@ Optionally, QPDF can be execute from a docker image
 Getting started
 ===============
 
-usage: statement_cleaner [-h] (-f FILE | -i INDIR) [-p PASSWORD] [-o OUTDIR]
-                         [--qpdf-path QPDF_PATH | --qpdf-docker-image QPDF_DOCKER_IMAGE]
-
-Cleanup bank statements PDF files, formatting dates with ISO format and removing encryption
-
-optional arguments:
-  -h, --help                                show this help message and exit
-  -f FILE, --file FILE                      PDF filename to be cleaned
-  -i INDIR, --indir INDIR                   Process all PDF files in this directory
-  -p PASSWORD, --password PASSWORD          Password to decrypt PDF file, if encrypted
-  -o OUTDIR, --outdir OUTDIR                Alternative directory to save files
-  --qpdf-path QPDF_PATH                     Absolute path to qpdf executable, eg: /usr/local/bin/qpdf
-  --qpdf-docker-image QPDF_DOCKER_IMAGE     Docker image containing qpdf
+    usage: statement_cleaner [-h] (-f FILE | -i INDIR) [-p PASSWORD] [-o OUTDIR]
+                             [--qpdf-path QPDF_PATH | --qpdf-docker-image QPDF_DOCKER_IMAGE]
+    
+    Cleanup bank statements PDF files, formatting dates with ISO format and removing encryption
+    
+    optional arguments:
+      -h, --help                                show this help message and exit
+      -f FILE, --file FILE                      PDF filename to be cleaned
+      -i INDIR, --indir INDIR                   Process all PDF files in this directory
+      -p PASSWORD, --password PASSWORD          Password to decrypt PDF file, if encrypted
+      -o OUTDIR, --outdir OUTDIR                Alternative directory to save files
+      --qpdf-path QPDF_PATH                     Absolute path to qpdf executable, eg: /usr/local/bin/qpdf
+      --qpdf-docker-image QPDF_DOCKER_IMAGE     Docker image containing qpdf
 
 
 Profiles
